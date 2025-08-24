@@ -30,7 +30,7 @@
             <ul id="history" class="mt-4 space-y-2"></ul>
             <div class="flex space-x-2 mt-4">
                 <button id="clearAppData" class="flex-1 bg-red-500 text-white p-2 rounded-lg">このアプリの記録を削除</button>
-                <button id="exportCSV" class="flex-1 bg-green-500 text-white p-2 rounded-lg">CSVエクスポート</button>
+                <button id="exportCSV" class="flex-1 bg-green-500 text-white p-2 rounded-lg" title="Excelで文字化けしにくいUTF-8(BOM)で出力">CSVエクスポート</button>
             </div>
         </div>
     </div>
@@ -108,22 +108,28 @@
             }
         });
 
+        // ---- CSVエクスポート（Excelで文字化けしにくいUTF-8 with BOM + CRLF） ----
         document.getElementById('exportCSV').addEventListener('click', () => {
             if (history.length === 0) {
                 alert('記録がありません');
                 return;
             }
-            let csvContent = 'data:text/csv;charset=utf-8,日付,スコア,評価\n';
-            history.forEach(h => {
-                csvContent += `${h.date},${h.score},${getEvaluation(h.score)}\n`;
-            });
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement('a');
-            link.setAttribute('href', encodedUri);
-            link.setAttribute('download', 'who5_records.csv');
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const header = ['日付','スコア','評価'];
+            const rows = history.map(h => [h.date, String(h.score), getEvaluation(h.score)]);
+            const csvArray = [header, ...rows]
+              .map(cols => cols.map(v => String(v).replaceAll('"','""')).map(v => /[",\n\r]/.test(v) ? `"${v}"` : v).join(','))
+              .join('\r\n');
+            // UTF-8 BOM を先頭に付ける
+            const BOM = new Uint8Array([0xEF,0xBB,0xBF]);
+            const blob = new Blob([BOM, csvArray], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'who5_records.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
         });
     </script>
 </body>
